@@ -15,9 +15,9 @@ from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
 from consts import (CONTEXT_PROMPT, EMBEDDINGS_MODEL_NAME, FAISS_INDEX_PATH,
-                    MAX_TOKENS_ANSWER, MODEL_URL, SYSTEM_PROMPT, TEMPERATURE,
+                    MAX_TOKENS_ANSWER, MODEL_PIPELINE_NAME, MODEL_URL, OPENAI_TOKEN, SYSTEM_PROMPT, TEMPERATURE,
                     TOP_K_DOCUMENTS)
-from script_utils import get_kwargs, get_logger
+from script_utils import get_kwargs, get_logger, get_messages
 
 app = FastAPI(
     title=("MAFIA QA assistant api."),
@@ -32,42 +32,70 @@ LOGGER = getLogger(__name__)
 async def call_model(
         query: str,
         url_out: str = MODEL_URL,
+        model_name: str = MODEL_PIPELINE_NAME,
+        history: list[dict[str, str]] | None = None,
         context: str | None = None,
         system_prompt: str | None = None,
         context_prompt: str | None = None,
         max_new_tokens: int = MAX_TOKENS_ANSWER,
         temperature: float = TEMPERATURE,
+        auth_token: str | None = OPENAI_TOKEN
 ) -> str:
-    """Send query to LLM service.
+    """
+    For openai use specify OpenAI
+    MODEL_URL, OPENAI_TOKEN,
+    MODEL_PIPELINE_NAME (openai model name, e.g. gpt-3.5.-turbo)
+    and TOKENIZER_NAME in .env,
+    For hosted models use MODEL_URL with your
+    model host and port and don't specify OPENAI_TOKEN.
 
     Parameters
     ----------
-    query: str
-        User question.
+    model_name: str
+        Openai model name or pipeline name
+        from pipeline name.
+    history: list[dict[str, str]] | None = None
+        E.g. [{"role": "user", "content": "Hello!"},
+              {"role": "assistant", "content": "Hi! How are you?"},
+              {"role": "user", "content": "I'm fine, and you?"}]
+    query: str | None
+        For summarization task it is a query for summarization,
+        QUERY_SUMMARIZE, by default. For dialog task it is new user question.
     context: str | None
-        Context if present.
-    system_prompt: str| None
-        Model sustem prompt.
-    context_prompt: str | None
-        Prompt to add in fromt of context.
-    max_new_tokens: int
-        Max tokens to generate.
-    temperature: float
-        Model temperature.
+        For summarization task it is a text to summarize.
+        For dialog task it is a context for dialog if needed.
+    auth_token: str | None
+        Openai auth token. None for local models.
     """
-    data = {
-        'query': query,
-        'context': context,
-        'system_prompt': system_prompt,
-        'context_prompt': context_prompt,
-        'max_tokens': max_new_tokens,
-        'temperature': temperature,
-    }
+    messages = get_messages(question=query,
+                            history=history,
+                            context=context,
+                            system_prompt=system_prompt,
+                            context_prompt=context_prompt)
 
-    response = requests.post(url_out, json=data, timeout=1000)
+    data = {
+        'model': model_name,
+        'messages': messages,
+        'max_tokens': max_new_tokens,
+        'temperature': temperature
+    }
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
+    response = requests.post(
+        url_out, json=data, headers=headers, timeout=2000)
 
     response_dict = json.loads(response.text)
-    return response_dict['answer']
+    LOGGER.info("Got response_dict:\n%s", response_dict)
+    end_status = response_dict["choices"][0]["finish_reason"]
+    if end_status != "stop":
+        LOGGER.warning(
+            "Сut output: finish_reason = %s. "
+            "Probably there are too many tokens in your queries. "
+            "Read more in "
+            "https://platform.openai.com/docs/api-reference/making-requests",
+            end_status
+        )
+    model_answer = response_dict['choices'][0]['message']['content']
+    return model_answer
 
 
 @app.post('/answer')

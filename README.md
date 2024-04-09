@@ -68,7 +68,7 @@ poetry install --with call_qa
 **Пример использования :**
 
 ```python
-url = "http://158.160.71.89:5058/healthcheck"
+url = "http://158.100.100.100:5058/healthcheck"
 response = requests.get(url)
 response.text
 ```

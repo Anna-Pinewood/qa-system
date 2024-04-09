@@ -23,3 +23,9 @@ MAX_TOKENS_ANSWER = int(os.environ.get(
     "MAX_TOKENS_ANSWER", default=config_env.get("MAX_TOKENS_ANSWER")))
 TEMPERATURE = int(os.environ.get(
     "TEMPERATURE", default=config_env.get("TEMPERATURE")))
+
+
+MODEL_PIPELINE_NAME = os.environ.get(
+    "MODEL_PIPELINE_NAME", default=config_env.get("MODEL_PIPELINE_NAME"))
+OPENAI_TOKEN = os.environ.get(
+    "OPENAI_TOKEN", default=config_env.get("OPENAI_TOKEN"))

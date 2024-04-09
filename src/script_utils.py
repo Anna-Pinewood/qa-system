@@ -39,3 +39,44 @@ def get_logger(
     stdout_handler.setFormatter(formatter)
     logger.addHandler(stdout_handler)
     return logger
+
+
+def get_messages(question: str | None = None,
+                 history: list[dict[str, str]] | None = None,
+                 context: str | None = None,
+                 system_prompt: str | None = None,
+                 context_prompt: str | None = None
+                 ) -> list[dict[str, str]]:
+
+    if history is None:
+        history = []
+
+    if system_prompt is not None:
+        system_prompt_message = {
+            'role': 'system',
+            'content': system_prompt
+        }
+        history = [system_prompt_message] + history
+
+    if (len(history) > 1 and history[0]['role'] == "system"
+            and history[1]['role'] == "system"):
+        raise ValueError("Passed history contains system prompt."
+                         "More then one systen prompt is not allowed.")
+
+    if context is not None:
+        context_prompt = context_prompt + "\n" if context_prompt else ""
+        context_text = context_prompt + context
+
+        context_message = {
+            'role': 'user',
+            'content': context_text
+        }
+        history.append(context_message)
+
+    if question is not None:
+        question_message = {
+            "role": 'user',
+            "content": question
+        }
+        history.append(question_message)
+    return history
